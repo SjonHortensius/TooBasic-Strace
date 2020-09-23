@@ -21,7 +21,6 @@ abstract class Syscall
 			eval('namespace PhpFpmStrace\Syscall; use '. static::class .' as p; class '. ucfirst($call) .' extends p {}');
 
 	    // decode structures, pointers and arrays
-var_dump($args);print_r(self::parseArguments($args));
 		$args = self::parseArguments($args);
 
 		try
@@ -43,6 +42,7 @@ var_dump($args);print_r(self::parseArguments($args));
 	{
 		$args = [];
 		$state = null;
+		$sub = [];
 		$buffer = "";
 		$depth = 0;
 
@@ -53,55 +53,58 @@ var_dump($args);print_r(self::parseArguments($args));
 			switch ($state)
 			{
 				case null:
-					if ('"' === $c)		$state = 'string';
+						if ('"' === $c) $state = 'string';
 					elseif ('{' === $c)	$state = 'struct';
 					elseif ('[' === $c)	$state = 'array';
 					elseif (',' === $c && ' ' === $raw[$i+1])
 					{
-						$args [] = $buffer;
+						array_push($args, $buffer);
 						$buffer = "";
-						$i++;
+						$i++; // skip space
 					}
 					else
 						$buffer .= $c;
 				break;
 
+				// needed to eat 'special' chars such as '[' in strings
 				case 'string':
-					if ('"' == $c)
+					if ('\\' == $c && '"' === $raw[$i+1])
 					{
-						$args []= $buffer;
-						$state = null;
+						$buffer .= $c;
+						// skip encoded "
+						$i++;
+					}
+					elseif ('"' == $c)
+					{
+						array_push($args, $buffer);
 						$buffer = "";
+
+						$state = null;
 					}
 					else
 						$buffer .= $c;
 				break;
 
 				case 'array':
-					if (!isset($sub))
-						$sub = [];
-
+					// First handle nesting
 					if ('[' === $c)		$depth++;
-					elseif (']' === $c)	$depth--;
-
-					if ($depth > 0)
+					elseif (']' === $c)
 					{
-						$buffer .= $c;
-						break;
-					}
-					elseif ($depth == -1)
-					{
-						$sub []= $buffer;
-						$args []= $sub;
+						$depth--;
 
-						unset($sub);
-						$depth = 0;
-						$state = null;
-						$buffer = "";
-						break;
+						if ($depth == -1)
+						{
+							// is merged to args by 'case null'
+							$buffer = array_merge($sub, [$buffer]);
+
+							$sub = [];
+							$depth = 0;
+							$state = null;
+							break;
+						}
 					}
 
-					if (',' === $c && ' ' === $raw[$i+1])
+					if ($depth == 0 && ',' === $c && ' ' === $raw[$i+1])
 					{
 						$sub []= $buffer;
 						$buffer = "";
@@ -110,31 +113,26 @@ var_dump($args);print_r(self::parseArguments($args));
 				break;
 
 				case 'struct':
-					if (!isset($sub))
-						$sub = [];
-
 					if ('{' === $c || '(' === $c)		$depth++;
-					elseif ('}' === $c || ')' === $c)	$depth--;
-
-					if ($depth > 0)
+					elseif ('}' === $c || ')' === $c)
 					{
-						$buffer .= $c;
-						break;
-					}
-					elseif ($depth == -1)
-					{
-						$kv = explode('=', $buffer, 2);
+						$depth--;
 
-						if (count($kv) == 2)$sub[$kv[0]] = $kv[1];
-						else				$sub []= $buffer;
+						if ($depth == -1)
+						{
+							$kv = explode('=', $buffer, 2);
 
-						$args []= $sub;
+							if (count($kv) == 2)$sub[$kv[0]] = $kv[1];
+							else				$sub []= $buffer;
 
-						unset($sub);
-						$depth = 0;
-						$state = null;
-						$buffer = "";
-						break;
+							// is merged to args by 'case null'
+							$buffer = $sub;
+
+							$sub = [];
+							$depth = 0;
+							$state = null;
+							break;
+						}
 					}
 
 					if ($depth === 0 && ',' === $c && ' ' === $raw[$i+1])
@@ -151,9 +149,11 @@ var_dump($args);print_r(self::parseArguments($args));
 				break;
 
 				default:
-					throw new Exception("unknown state `%s`", $state);
+					throw new Exception("unknown state `%s`", [$state]);
 			}
 		}
+
+		$args [] = $buffer;
 
 		return $args;
 	}

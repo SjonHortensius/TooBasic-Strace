@@ -7,7 +7,7 @@ class Accept extends \PhpFpmStrace\Syscall implements Opener
 	protected int $_retn;
 	protected $_closer;
 
-	public function __construct(int $fromSocket, string $sockAddr, string $sockLen)
+	public function __construct(int $fromSocket, array $sockAddr, array $sockLen)
 	{
 		$this->_fromSocket = $fromSocket;
 	}

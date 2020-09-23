@@ -8,7 +8,7 @@ class Connect extends \PhpFpmStrace\Syscall implements Opener
 	protected int $_retn;
 	protected $_closer;
 
-	public function __construct(int $socket, string $sockAddr, string $sockLen)
+	public function __construct(int $socket, array $sockAddr, string $sockLen)
 	{
 		$this->_socket = $socket;
 		$this->_socketAddress = $sockAddr;
