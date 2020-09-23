@@ -21,7 +21,7 @@ abstract class Syscall
 			eval('namespace PhpFpmStrace\Syscall; use '. static::class .' as p; class '. ucfirst($call) .' extends p {}');
 
 	    // decode structures, pointers and arrays
-		var_dump($args, self::parseArguments($args));
+var_dump($args);print_r(self::parseArguments($args));
 		$args = self::parseArguments($args);
 
 		try
@@ -38,46 +38,124 @@ abstract class Syscall
 		return $syscall;
 	}
 
+	// break up the string of arguments into an array representing only the TOP arguments
 	protected static function parseArguments(string $raw): array
 	{
-		if (
-			substr_count($raw, '{') != substr_count($raw, '}') ||
-			substr_count($raw, '[') != substr_count($raw, ']')
-		)
-			throw new Exception("Unbalanced arguments `%s`, cannot parse", [$raw]);
+		$args = [];
+		$state = null;
+		$buffer = "";
+		$depth = 0;
 
-		$parts = [];
-		$raw = explode(', ', $raw);
-		for ($i = 0; $i<count($raw); $i++)
+		for ($i = 0; $i<strlen($raw); $i++)
 		{
-			$part = $raw[$i];
+			$c = $raw[$i];
 
-			if (in_array($part[0], ['[', '{']))
+			switch ($state)
 			{
-				var_dump("found start: ". $part);
-				$part = substr($part, 1);
-				$sub = [];
+				case null:
+					if ('"' === $c)		$state = 'string';
+					elseif ('{' === $c)	$state = 'struct';
+					elseif ('[' === $c)	$state = 'array';
+					elseif (',' === $c && ' ' === $raw[$i+1])
+					{
+						$args [] = $buffer;
+						$buffer = "";
+						$i++;
+					}
+					else
+						$buffer .= $c;
+				break;
 
-				while (!in_array($part[strlen($part)-1], [']', '}']))
-				{
-					var_dump("not the end: ". $part);
-					$sub []= $part;
-					$part = $raw[++$i];
-				}
+				case 'string':
+					if ('"' == $c)
+					{
+						$args []= $buffer;
+						$state = null;
+						$buffer = "";
+					}
+					else
+						$buffer .= $c;
+				break;
 
-				$part = substr($part, 0, strlen($part)-1);
-				$sub []= $part;
+				case 'array':
+					if (!isset($sub))
+						$sub = [];
 
-//				array_push($parts, self::parseArguments(implode(', ', $sub)));
-				array_push($parts, $sub);
-				var_dump("done: ". $part, print_r($parts, 1));
+					if ('[' === $c)		$depth++;
+					elseif (']' === $c)	$depth--;
+
+					if ($depth > 0)
+					{
+						$buffer .= $c;
+						break;
+					}
+					elseif ($depth == -1)
+					{
+						$sub []= $buffer;
+						$args []= $sub;
+
+						unset($sub);
+						$depth = 0;
+						$state = null;
+						$buffer = "";
+						break;
+					}
+
+					if (',' === $c && ' ' === $raw[$i+1])
+					{
+						$sub []= $buffer;
+						$buffer = "";
+					} else
+						$buffer .= $c;
+				break;
+
+				case 'struct':
+					if (!isset($sub))
+						$sub = [];
+
+					if ('{' === $c || '(' === $c)		$depth++;
+					elseif ('}' === $c || ')' === $c)	$depth--;
+
+					if ($depth > 0)
+					{
+						$buffer .= $c;
+						break;
+					}
+					elseif ($depth == -1)
+					{
+						$kv = explode('=', $buffer, 2);
+
+						if (count($kv) == 2)$sub[$kv[0]] = $kv[1];
+						else				$sub []= $buffer;
+
+						$args []= $sub;
+
+						unset($sub);
+						$depth = 0;
+						$state = null;
+						$buffer = "";
+						break;
+					}
+
+					if ($depth === 0 && ',' === $c && ' ' === $raw[$i+1])
+					{
+						$kv = explode('=', $buffer, 2);
+
+						if (count($kv) == 2)$sub[$kv[0]] = $kv[1];
+						else				$sub []= $buffer;
+
+						$buffer = "";
+						$i++;
+					} else
+						$buffer .= $c;
+				break;
+
+				default:
+					throw new Exception("unknown state `%s`", $state);
 			}
-			else//if false === substr($part, '(')
-				array_push($parts, $part);
 		}
 
-		return $parts;
-//		preg_match_all("/({.*?}|\[.*?\]|[^\[\]{}]+)(, |$)/", $args, $m);
+		return $args;
 	}
 
 	private function _setMeta(\DateTimeImmutable $time, int $retn)
