@@ -5,33 +5,34 @@ abstract class Syscall
 	protected \DateTimeImmutable $_time;
 	private string $_call;
 	protected array $_args;
-	protected int $_retn;
-	private static $_classes = [];
+	protected string $_returns;
+	protected array $_children = [];
 
 	public function __construct(...$args)
 	{
 		$this->_args = $args;
 	}
 
-	public static function fromCall(string $time, string $call, string $args, string $retn = ""): self
+	public static function fromCall(string $time, string $call, string $args, string $returns = ""): self
 	{
 		$class = '\\'. static::class .'\\'. ucfirst($call);
 
 		if (!class_exists($class))
 			eval('namespace PhpFpmStrace\Syscall; use '. static::class .' as p; class '. ucfirst($call) .' extends p {}');
 
-	    // decode structures, pointers and arrays
 		$args = self::parseArguments($args);
 
 		try
 		{
 		    /** @var Syscall $syscall */
 		    $syscall = (new \ReflectionClass($class))->newInstanceArgs($args);
-		} catch (\ArgumentCountError $e) {
+		}
+		catch (\ArgumentCountError $e)
+		{
 			throw new \Exception("Not enough args to construct ".$class . ' '. print_r($args, 1), 0, $e);
 		}
 
-		$syscall->_setMeta(\DateTimeImmutable::createFromFormat('H:i:s.u', $time), intval($retn));
+		$syscall->_setMeta(\DateTimeImmutable::createFromFormat('H:i:s.u', $time), $returns);
 		$syscall->_call = $call;
 
 		return $syscall;
@@ -71,8 +72,7 @@ abstract class Syscall
 					if ('\\' == $c && '"' === $raw[$i+1])
 					{
 						$buffer .= $c;
-						// skip encoded "
-						$i++;
+						$i++; // skip encoded "
 					}
 					elseif ('"' == $c)
 					{
@@ -87,7 +87,8 @@ abstract class Syscall
 
 				case 'array':
 					// First handle nesting
-					if ('[' === $c)		$depth++;
+					if ('[' === $c)
+						$depth++;
 					elseif (']' === $c)
 					{
 						$depth--;
@@ -104,16 +105,23 @@ abstract class Syscall
 						}
 					}
 
-					if ($depth == 0 && ',' === $c && ' ' === $raw[$i+1])
+					if ($depth == 0 &&
+							(',' === $c && ' ' === $raw[$i+1]) ||
+							(' ' === $c)
+					)
 					{
 						$sub []= $buffer;
 						$buffer = "";
+
+						if (',' === $c)
+							$i++; // skip space
 					} else
 						$buffer .= $c;
 				break;
 
 				case 'struct':
-					if ('{' === $c || '(' === $c)		$depth++;
+					if ('{' === $c || '(' === $c)
+						$depth++;
 					elseif ('}' === $c || ')' === $c)
 					{
 						$depth--;
@@ -158,10 +166,15 @@ abstract class Syscall
 		return $args;
 	}
 
-	private function _setMeta(\DateTimeImmutable $time, int $retn)
+	private function _setMeta(\DateTimeImmutable $time, string $returns)
 	{
 		$this->_time = $time;
-		$this->_retn = $retn;
+		$this->_returns = $returns;
+	}
+
+	public function executes(Syscall $c): void
+	{
+		$this->_children []= $c;
 	}
 
 	public function __toString(): string

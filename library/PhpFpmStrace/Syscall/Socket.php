@@ -1,11 +1,10 @@
-<?php
-namespace PhpFpmStrace\Syscall;
+<?php namespace PhpFpmStrace\Syscall;
 
-class Accept extends \PhpFpmStrace\Syscall implements Opener
+class Socket extends \PhpFpmStrace\Syscall implements Opener
 {
 	protected Closer $_closer;
 
-	public function __construct(int $fromSocket, array $sockAddr, array $sockLen)
+	public function __construct(string $domain, string $type, string $protocol)
 	{
 		parent::__construct(...func_get_args());
 	}
@@ -23,6 +22,6 @@ class Accept extends \PhpFpmStrace\Syscall implements Opener
 
 	public function __toString(): string
 	{
-		return sprintf('%s:accept[%s]', __CLASS__, $this->_returns);
+		return sprintf('%s:socket[%s]', __CLASS__, $this->_returns);
 	}
 }

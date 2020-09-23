@@ -20,15 +20,17 @@ class Process
 			foreach ($this->_open as $idx => $o)
 				if ($o->closedBy($c))
 				{
+					// FIXME Socketpair opens multiple sockets :/
 					unset($this->_open[$idx]);
 					$this->_calls []= $o;
 					return;
-				} else
-					echo $o ." did not open {$c->closes()}\n";
+				}
 
 			throw new Exception('Closer %s was not opened by any of [%s]', [$c, implode(', ', $this->_open)]);
-		} else
+		} elseif (empty($this->_open))
 			$this->_calls []= $c;
+		else
+			end($this->_open)->executes($c);
 	}
 }
 

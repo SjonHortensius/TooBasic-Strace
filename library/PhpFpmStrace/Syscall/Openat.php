@@ -3,17 +3,16 @@ namespace PhpFpmStrace\Syscall;
 
 class Openat extends \PhpFpmStrace\Syscall implements Opener
 {
-	protected $_fromSocket;
-	protected int $_retn;
-	protected $_closer;
+	protected Closer $_closer;
 
 	public function __construct(string $relTo, string $path, string $flag)
 	{
+		parent::__construct(...func_get_args());
 	}
 
 	public function closedBy(Closer $call): bool
 	{
-		if ($call->closes() == $this->_retn)
+		if ($call->closes() == $this->_returns)
 		{
 			$this->_closer = $call;
 			return true;
@@ -24,6 +23,6 @@ class Openat extends \PhpFpmStrace\Syscall implements Opener
 
 	public function __toString(): string
 	{
-		return sprintf('%s:openat[%s]', __CLASS__, $this->_retn);
+		return sprintf('%s:openat[%s]', __CLASS__, $this->_returns);
 	}
 }
