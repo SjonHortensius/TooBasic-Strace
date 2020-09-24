@@ -15,10 +15,8 @@ class Process
 	public function executes(Syscall $c): void
 	{
 		if ($c instanceof Syscall\Opener)
-		{
 			foreach ($c->spawns() as $id)
 				$this->_open[$id] = $c;
-		}
 		elseif ($c instanceof Syscall\Closer)
 		{
 			if (!array_key_exists($c->closes(), $this->_open))

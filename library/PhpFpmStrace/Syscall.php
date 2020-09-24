@@ -15,6 +15,7 @@ abstract class Syscall
 
 	public static function fromCall(string $time, string $call, string $args, string $returns = ""): self
 	{
+		/** @var Syscall $class $class */
 		$class = '\\'. static::class .'\\'. ucfirst($call);
 
 		if (!class_exists($class))
@@ -45,7 +46,9 @@ abstract class Syscall
 		}
 	}
 
-	// break up the string of arguments into an array representing only the TOP arguments
+	// break up the string of arguments into an array representing only the TOP arguments.
+	// This roughly equals `explode(', ', $raw)` or `preg_match_all("/({.*?}|\[.*?\]|[^\[\]{}]+)(, |$)/", $raw);`
+	// but it properly leaves nested elements intact
 	protected static function parseArguments(string $raw): array
 	{
 		$args = [];
@@ -70,8 +73,7 @@ abstract class Syscall
 					elseif ('[' === $c)	$state = 'array';
 					elseif (',' === $c && ' ' === $raw[$i+1])
 					{
-						array_push($args, $buffer);
-						$buffer = "";
+						array_push($args, $buffer); $buffer = "";
 						$i++; // eat space
 					}
 					else
@@ -86,45 +88,34 @@ abstract class Syscall
 						$i++; // eat encoded "
 					}
 					elseif ('"' == $c)
-					{
-						array_push($args, $buffer);
-						$buffer = "";
 						$state = null;
-					}
 					else
 						$buffer .= $c;
 				break;
 
 				case 'array':
-					// First handle nesting
-					if ('[' === $c)
+					// detect nested items in array, and prevent splitting on those
+					if (in_array($c, ['{', '(', '[']))
 						$depth++;
-					elseif (']' === $c)
+					elseif (in_array($c, ['}', ')', ']']))
+						$depth--;
+
+					if ($depth == -1)
 					{
-						$depth--;
-
-						if ($depth == -1)
-						{
-							// is merged to args by 'case null'
-							$buffer = array_merge($sub, [$buffer]);
-							$state = null;
-							break;
-						}
+						// is merged to args by 'case null'
+						$buffer = array_merge($sub, [$buffer]);
+						$state = null;
 					}
-
-					// detect structs or other special items in array, and don't split them
-					if ('{' === $c || '(' === $c)
-						$depth++;
-					elseif ('}' === $c || ')' === $c)
-						$depth--;
-
-					if ($depth == 0 && ( (',' === $c && ' ' === $raw[$i+1]) || ' ' === $c))
+					elseif (',' === $c && ' ' === $raw[$i+1])
 					{
 						$sub []= $buffer;
 						$buffer = "";
-
-						if (',' === $c)
-							$i++; // eat space
+						$i++; // eat space
+					}
+					elseif (' ' === $c)
+					{
+						$sub []= $buffer;
+						$buffer = "";
 					} else
 						$buffer .= $c;
 				break;
@@ -133,32 +124,28 @@ abstract class Syscall
 					if ('{' === $c || '(' === $c)
 						$depth++;
 					elseif ('}' === $c || ')' === $c)
-					{
 						$depth--;
 
-						if ($depth == -1)
-						{
-							$kv = explode('=', $buffer, 2);
-
-							if (count($kv) == 2)$sub[$kv[0]] = $kv[1];
-							else				$sub []= $buffer;
-
-							// is merged to args by 'case null'
-							$buffer = $sub;
-							$state = null;
-							break;
-						}
-					}
-
-					if ($depth === 0 && ',' === $c && ' ' === $raw[$i+1])
+					if ($depth === -1 || ($depth === 0 && ',' === $c && ' ' === $raw[$i+1]))
 					{
 						$kv = explode('=', $buffer, 2);
 
-						if (count($kv) == 2)$sub[$kv[0]] = $kv[1];
-						else				$sub []= $buffer;
+						if (count($kv) == 2)
+							$sub[$kv[0]] = $kv[1];
+						else
+							$sub []= $buffer;
 
-						$buffer = "";
-						$i++;
+						if ($depth === -1)
+						{
+							// is merged to args by 'case null'
+							$buffer = $sub;
+							$state = null;
+						}
+						else
+						{
+							$buffer = "";
+							$i++; // eat space
+						}
 					} else
 						$buffer .= $c;
 				break;
