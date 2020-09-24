@@ -20,21 +20,29 @@ abstract class Syscall
 		if (!class_exists($class))
 			eval('namespace PhpFpmStrace\Syscall; use '. static::class .' as p; class '. ucfirst($call) .' extends p {}');
 
-		$args = self::parseArguments($args);
-
-		try
-		{
-		    /** @var Syscall $syscall */
-		    $syscall = (new \ReflectionClass($class))->newInstanceArgs($args);
-		}
-		catch (\ArgumentCountError $e)
-		{
-			throw new \Exception("Not enough args to construct ".$class . ' '. print_r($args, 1), 0, $e);
-		}
-
+	    $syscall = $class::fromRawArguments($args);
 		$syscall->_setMeta(\DateTimeImmutable::createFromFormat('H:i:s.u', $time), $returns);
 
 		return $syscall;
+	}
+
+	protected static function fromRawArguments(string $raw): self
+	{
+		$args = self::parseArguments($raw);
+
+		try
+		{
+			return (new \ReflectionClass(static::class))->newInstanceArgs($args);
+		}
+		catch (\ArgumentCountError $e)
+		{
+			throw new \Exception("Not enough args to construct ". static::class . ': '. print_r($args, true), 0, $e);
+		}
+		catch (\TypeError $e)
+		{
+			var_dump("Invalid args to construct ". static::class . ': '. print_r($args, true));
+			throw new \Exception("Invalid args to construct ". static::class . ': '. print_r($args, true), 0, $e);
+		}
 	}
 
 	// break up the string of arguments into an array representing only the TOP arguments
@@ -42,8 +50,8 @@ abstract class Syscall
 	{
 		$args = [];
 		$state = null;
-		$sub = [];
 		$buffer = "";
+		$sub = [];
 		$depth = 0;
 
 		for ($i = 0; $i<strlen($raw); $i++)
@@ -53,6 +61,10 @@ abstract class Syscall
 			switch ($state)
 			{
 				case null:
+					// Reset for deeper blocks once they complete
+					$sub = [];
+					$depth = 0;
+
 						if ('"' === $c) $state = 'string';
 					elseif ('{' === $c)	$state = 'struct';
 					elseif ('[' === $c)	$state = 'array';
@@ -60,7 +72,7 @@ abstract class Syscall
 					{
 						array_push($args, $buffer);
 						$buffer = "";
-						$i++; // skip space
+						$i++; // eat space
 					}
 					else
 						$buffer .= $c;
@@ -71,13 +83,12 @@ abstract class Syscall
 					if ('\\' == $c && '"' === $raw[$i+1])
 					{
 						$buffer .= $c;
-						$i++; // skip encoded "
+						$i++; // eat encoded "
 					}
 					elseif ('"' == $c)
 					{
 						array_push($args, $buffer);
 						$buffer = "";
-
 						$state = null;
 					}
 					else
@@ -96,24 +107,24 @@ abstract class Syscall
 						{
 							// is merged to args by 'case null'
 							$buffer = array_merge($sub, [$buffer]);
-
-							$sub = [];
-							$depth = 0;
 							$state = null;
 							break;
 						}
 					}
 
-					if ($depth == 0 &&
-							(',' === $c && ' ' === $raw[$i+1]) ||
-							(' ' === $c)
-					)
+					// detect structs or other special items in array, and don't split them
+					if ('{' === $c || '(' === $c)
+						$depth++;
+					elseif ('}' === $c || ')' === $c)
+						$depth--;
+
+					if ($depth == 0 && ( (',' === $c && ' ' === $raw[$i+1]) || ' ' === $c))
 					{
 						$sub []= $buffer;
 						$buffer = "";
 
 						if (',' === $c)
-							$i++; // skip space
+							$i++; // eat space
 					} else
 						$buffer .= $c;
 				break;
@@ -134,9 +145,6 @@ abstract class Syscall
 
 							// is merged to args by 'case null'
 							$buffer = $sub;
-
-							$sub = [];
-							$depth = 0;
 							$state = null;
 							break;
 						}
@@ -160,7 +168,7 @@ abstract class Syscall
 			}
 		}
 
-		$args [] = $buffer;
+		array_push($args, $buffer);
 
 		return $args;
 	}
@@ -170,13 +178,18 @@ abstract class Syscall
 		$this->_time = $time;
 
 		if (false === strpos($returns, ' '))
-			$this->_returns = intval($returns);
+			$returns = intval($returns);
 		else
-			[$this->_returns, $this->_returnVerbose] = explode(' ', $returns, 2);
+			[$returns, $this->_returnVerbose] = explode(' ', $returns, 2);
+
+		if (false !== strpos($returns, 'x'))
+			$returns = hexdec($returns);
+
+		$this->_returns = $returns;
 	}
 
 	public function __toString(): string
 	{
-		return sprintf('%s:%s', __CLASS__);
+		return sprintf('%s', __CLASS__);
 	}
 }

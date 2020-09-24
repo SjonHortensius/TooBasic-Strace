@@ -22,6 +22,6 @@ class Socket extends \PhpFpmStrace\Syscall implements Opener
 
 	public function __toString(): string
 	{
-		return sprintf('%s:socket[%s]', __CLASS__, $this->_returns);
+		return sprintf('%s[%s]', __CLASS__, $this->_returns);
 	}
 }

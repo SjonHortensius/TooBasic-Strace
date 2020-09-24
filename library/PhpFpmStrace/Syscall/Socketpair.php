@@ -23,6 +23,6 @@ class Socketpair extends \PhpFpmStrace\Syscall implements Opener
 
 	public function __toString(): string
 	{
-		return sprintf('%s:socket[%s]', __CLASS__, implode(',', $this->_sockets));
+		return sprintf('%s[%s]', __CLASS__, implode(',', $this->_sockets));
 	}
 }

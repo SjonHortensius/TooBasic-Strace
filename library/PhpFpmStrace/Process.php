@@ -24,23 +24,10 @@ class Process
 			if (!array_key_exists($c->closes(), $this->_open))
 				throw new Exception('Closer %s was not opened by any of [%s]', [$c, implode(', ', $this->_open)]);
 
+			$this->_open[ $c->closes() ]->closedBy($c);
 			unset($this->_open[ $c->closes() ]);
-			/** @var Opener $o */
-			foreach ($this->_open as $idx => $o)
-				if ($o->closedBy($c))
-				{
-					unset($this->_open[$idx]);
-				}
-
-
 		}
 
 		$this->_calls []= $c;
 	}
-
-	public function getChildren(): array
-	{
-		return $this->_childs;
-	}
 }
-
