@@ -6,10 +6,16 @@ class Process
 	protected int $_id;
 	protected array $_calls;
 	protected array $_open;
+	protected $_listeners = [];
 
 	public function __construct(int $id)
 	{
 		$this->_id = $id;
+
+		$this->_listeners = [
+			new Operation\MemcacheQuery,
+			new Operation\MysqlQuery,
+		];
 	}
 
 	public function executes(Syscall $c): void
@@ -27,5 +33,9 @@ class Process
 		}
 
 		$this->_calls []= $c;
+
+		foreach ($this->_listeners as $l)
+			foreach ($l->executes($c) as $msg)
+				print $msg."\n";
 	}
 }

@@ -6,6 +6,7 @@ class Close extends \PhpFpmStrace\Syscall implements Closer
 
 	public function __construct(int $socket)
 	{
+		parent::__construct(...func_get_args());
 		$this->_socket = $socket;
 	}
 

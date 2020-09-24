@@ -46,6 +46,16 @@ abstract class Syscall
 		}
 	}
 
+	public function getTimestamp(): \DateTimeImmutable
+	{
+		return $this->_time;
+	}
+
+	public function getArgument(int $index)
+	{
+		return $this->_args[$index];
+	}
+
 	// break up the string of arguments into an array representing only the TOP arguments.
 	// This roughly equals `explode(', ', $raw)` or `preg_match_all("/({.*?}|\[.*?\]|[^\[\]{}]+)(, |$)/", $raw);`
 	// but it properly leaves nested elements intact
@@ -73,7 +83,7 @@ abstract class Syscall
 					elseif ('[' === $c)	$state = 'array';
 					elseif (',' === $c && ' ' === $raw[$i+1])
 					{
-						array_push($args, $buffer); $buffer = "";
+						$args []= $buffer; $buffer = "";
 						$i++; // eat space
 					}
 					else
