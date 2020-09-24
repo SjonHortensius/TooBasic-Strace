@@ -1,5 +1,4 @@
-<?php
-namespace PhpFpmStrace\Syscall;
+<?php namespace PhpFpmStrace\Syscall;
 
 class Openat extends \PhpFpmStrace\Syscall implements Opener
 {
@@ -10,19 +9,19 @@ class Openat extends \PhpFpmStrace\Syscall implements Opener
 		parent::__construct(...func_get_args());
 	}
 
-	public function closedBy(Closer $call): bool
+	public function spawns(): array
 	{
-		if ($call->closes() == $this->_returns)
-		{
-			$this->_closer = $call;
-			return true;
-		}
-
-		return false;
+		return [$this->_returns];
 	}
+
+	public function closedBy(Closer $call): void
+	{
+		$this->_closer = $call;
+	}
+
 
 	public function __toString(): string
 	{
-		return sprintf('%s:openat[%s]', __CLASS__, $this->_returns);
+		return sprintf('%s[%s]', __CLASS__, $this->_returns);
 	}
 }

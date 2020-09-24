@@ -13,5 +13,5 @@ spl_autoload_register(function($class){
 	return require_once($path);
 });
 
-print'<pre>';
+print'<pre style="background:black; color: white;">';
 Analyzer::run();

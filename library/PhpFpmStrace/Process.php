@@ -1,4 +1,5 @@
 <?php namespace PhpFpmStrace;
+use PhpFpmStrace\Syscall\Opener;
 
 class Process
 {
@@ -14,23 +15,32 @@ class Process
 	public function executes(Syscall $c): void
 	{
 		if ($c instanceof Syscall\Opener)
-			$this->_open []= $c;
+		{
+			foreach ($c->spawns() as $id)
+				$this->_open[$id] = $c;
+		}
 		elseif ($c instanceof Syscall\Closer)
 		{
+			if (!array_key_exists($c->closes(), $this->_open))
+				throw new Exception('Closer %s was not opened by any of [%s]', [$c, implode(', ', $this->_open)]);
+
+			unset($this->_open[ $c->closes() ]);
+			/** @var Opener $o */
 			foreach ($this->_open as $idx => $o)
 				if ($o->closedBy($c))
 				{
-					// FIXME Socketpair opens multiple sockets :/
 					unset($this->_open[$idx]);
-					$this->_calls []= $o;
-					return;
 				}
 
-			throw new Exception('Closer %s was not opened by any of [%s]', [$c, implode(', ', $this->_open)]);
-		} elseif (empty($this->_open))
-			$this->_calls []= $c;
-		else
-			end($this->_open)->executes($c);
+
+		}
+
+		$this->_calls []= $c;
+	}
+
+	public function getChildren(): array
+	{
+		return $this->_childs;
 	}
 }
 

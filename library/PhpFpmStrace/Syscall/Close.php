@@ -1,5 +1,4 @@
-<?php
-namespace PhpFpmStrace\Syscall;
+<?php namespace PhpFpmStrace\Syscall;
 
 class Close extends \PhpFpmStrace\Syscall implements Closer
 {

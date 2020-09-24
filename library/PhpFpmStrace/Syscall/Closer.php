@@ -1,7 +1,6 @@
-<?php
-namespace PhpFpmStrace\Syscall;
+<?php namespace PhpFpmStrace\Syscall;
 
 interface Closer
 {
-	public function closes();
+	public function closes(): int;
 }

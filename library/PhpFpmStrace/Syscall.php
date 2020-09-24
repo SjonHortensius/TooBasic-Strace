@@ -3,10 +3,10 @@
 abstract class Syscall
 {
 	protected \DateTimeImmutable $_time;
-	private string $_call;
+	protected int $_returns;
+	protected string $_returnVerbose;
+
 	protected array $_args;
-	protected string $_returns;
-	protected array $_children = [];
 
 	public function __construct(...$args)
 	{
@@ -33,7 +33,6 @@ abstract class Syscall
 		}
 
 		$syscall->_setMeta(\DateTimeImmutable::createFromFormat('H:i:s.u', $time), $returns);
-		$syscall->_call = $call;
 
 		return $syscall;
 	}
@@ -169,16 +168,15 @@ abstract class Syscall
 	private function _setMeta(\DateTimeImmutable $time, string $returns)
 	{
 		$this->_time = $time;
-		$this->_returns = $returns;
-	}
 
-	public function executes(Syscall $c): void
-	{
-		$this->_children []= $c;
+		if (false === strpos($returns, ' '))
+			$this->_returns = intval($returns);
+		else
+			[$this->_returns, $this->_returnVerbose] = explode(' ', $returns, 2);
 	}
 
 	public function __toString(): string
 	{
-		return sprintf('%s:%s', __CLASS__, $this->_call);
+		return sprintf('%s:%s', __CLASS__);
 	}
 }

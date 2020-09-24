@@ -1,5 +1,4 @@
-<?php
-namespace PhpFpmStrace;
+<?php namespace PhpFpmStrace;
 
 class Analyzer
 {

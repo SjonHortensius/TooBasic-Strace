@@ -11,19 +11,18 @@ class Socketpair extends \PhpFpmStrace\Syscall implements Opener
 		$this->_sockets = array_map('intval', $v);
 	}
 
-	public function closedBy(Closer $call): bool
+	public function spawns(): array
 	{
-		if (in_array($call->closes(), $this->_sockets))
-		{
-			$this->_closer = $call;
-			return true;
-		}
+		return $this->_sockets;
+	}
 
-		return false;
+	public function closedBy(Closer $call): void
+	{
+		$this->_closer = $call;
 	}
 
 	public function __toString(): string
 	{
-		return sprintf('%s:socket[%s]', __CLASS__, $this->_returns);
+		return sprintf('%s:socket[%s]', __CLASS__, implode(',', $this->_sockets));
 	}
 }

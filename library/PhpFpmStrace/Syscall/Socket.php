@@ -9,16 +9,16 @@ class Socket extends \PhpFpmStrace\Syscall implements Opener
 		parent::__construct(...func_get_args());
 	}
 
-	public function closedBy(Closer $call): bool
+	public function spawns(): array
 	{
-		if ($call->closes() == $this->_returns)
-		{
-			$this->_closer = $call;
-			return true;
-		}
-
-		return false;
+		return [$this->_returns];
 	}
+
+	public function closedBy(Closer $call): void
+	{
+		$this->_closer = $call;
+	}
+
 
 	public function __toString(): string
 	{
