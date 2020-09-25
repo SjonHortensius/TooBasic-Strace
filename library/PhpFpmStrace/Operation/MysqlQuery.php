@@ -15,16 +15,11 @@ class MysqlQuery implements Observer
 		$this->_spent = new Interval;
 	}
 
-	public static function register(Syscall\Opener $c): ?self
-	{
-		return ($c instanceof Syscall\Connect && 3306 === $c->port) ? new self : null;
-	}
-
 	public function observe(Syscall $c): \Generator
 	{
 		$msg = sprintf('[%s] %s: %%s', $c->getTimestamp()->format("H:m:s.u"), __CLASS__);
 
-		if ($c instanceof Syscall\Connect)
+		if ($c instanceof Syscall\Connect && 3306 === $c->port)
 		{
 			$host = $c->getArgument(1)["sin_addr"] ?? explode('"', $c->getArgument(1)[0])[1];
 			yield sprintf($msg, 'connecting to '.$host);
@@ -61,8 +56,8 @@ class MysqlQuery implements Observer
 			unset($this->_fds[ $c->getArgument(0) ]);
 	}
 
-	public function unregister(Syscall\Closer $c): void
+	public function summary(): array
 	{
-		$this->_fds = [];
+		return [];
 	}
 }

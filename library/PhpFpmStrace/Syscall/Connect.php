@@ -1,6 +1,6 @@
 <?php namespace PhpFpmStrace\Syscall;
 
-class Connect extends \PhpFpmStrace\Syscall implements Operator
+class Connect extends \PhpFpmStrace\Syscall
 {
 	public int $port;
 	protected int $_descriptor;
@@ -11,11 +11,6 @@ class Connect extends \PhpFpmStrace\Syscall implements Operator
 
 		$this->_descriptor = $socket;
 		$this->port = intval(trim($sockAddr["sin_port"]??$sockAddr["sin6_port"], 'htons()'));
-	}
-
-	public function getDescriptors(): array
-	{
-		return [$this->_descriptor];
 	}
 
 	public function __toString(): string

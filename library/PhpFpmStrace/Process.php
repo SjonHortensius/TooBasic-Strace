@@ -13,46 +13,16 @@ class Process
 	public function __construct(int $id)
 	{
 		$this->_id = $id;
+
+		foreach (Analyzer::getObservers() as $class)
+			$this->_observers []= new $class;
 	}
 
 	public function executes(Syscall $c): void
 	{
-		if ($c instanceof Syscall\Opener)
-		{
-			foreach (Analyzer::getObservers() as $class)
-			{
-				foreach ($c->spawns() as $id)
-				{
-					$this->_open[$id] = $c;
-
-					/** @var Operation\Observer $class */
-					$observer = $class::register(clone $c);
-
-					if (isset($observer))
-						$this->_observers[$id] = $observer;
-				}
-			}
-		}
-		elseif ($c instanceof Syscall\Closer)
-		{
-			$id = $c->closes();
-
-			if (!array_key_exists($id, $this->_open))
-				throw new Exception('Closer %s was not opened by any of [%s]', [$c, implode(', ', $this->_open)]);
-
-			$this->_open[$id]->closedBy(clone $c);
-			if (array_key_exists($id, $this->_observers))
-				$this->_observers[$id]->unregister(clone $c);
-
-			unset($this->_open[$id], $this->_observers[$id]);
-		}
-		elseif ($c instanceof Syscall\Operator)
-		{
-			foreach ($c->getDescriptors() as $id)
-				if (array_key_exists($id, $this->_observers))
-					foreach ($this->_observers[$id]->observe(clone $c) as $msg)
-						print $msg ."\n";
-		}
+		foreach ($this->_observers as $observer)
+			foreach ($observer->observe(clone $c) as $msg)
+				print $msg ."\n";
 
 		$this->_calls []= $c;
 	}
