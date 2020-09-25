@@ -115,13 +115,13 @@ abstract class Syscall
 						$buffer = array_merge($sub, [$buffer]);
 						$state = null;
 					}
-					elseif (',' === $c && ' ' === $raw[$i+1])
+					elseif ($depth == 0 && ',' === $c && ' ' === $raw[$i+1])
 					{
 						$sub []= $buffer;
 						$buffer = "";
 						$i++; // eat space
 					}
-					elseif (' ' === $c)
+					elseif ($depth == 0 && ' ' === $c)
 					{
 						$sub []= $buffer;
 						$buffer = "";

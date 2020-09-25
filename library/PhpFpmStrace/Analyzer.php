@@ -29,7 +29,8 @@ class Analyzer
 			$processes[$pid]->executes($c);
 		}
 
-		print_r($processes);
+		foreach ($processes as $process)
+			$process->summary();
 	}
 
 	public static function getObservers(): array

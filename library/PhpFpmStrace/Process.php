@@ -5,8 +5,6 @@ class Process
 	protected int $_id;
 	/** @var Syscall[] $_calls */
 	protected array $_calls;
-	/** @var Syscall\Opener[] $_open */
-	protected array $_open;
 	/** @var Operation\Observer[] $_observers */
 	protected array $_observers = [];
 
@@ -25,5 +23,14 @@ class Process
 				print $msg ."\n";
 
 		$this->_calls []= $c;
+	}
+
+	public function summary()
+	{
+		foreach ($this->_observers as $observer)
+		{
+			echo '** '. get_class($observer) .' **'."\n";
+			print_r($observer->summary());
+		}
 	}
 }

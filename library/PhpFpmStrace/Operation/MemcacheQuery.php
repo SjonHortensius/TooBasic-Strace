@@ -60,6 +60,9 @@ class MemcacheQuery implements Observer
 
 	public function summary(): array
 	{
-		return [];
+		return [
+			'queries' => $this->_hits,
+			'timeSpent' => (string)$this->_spent,
+		];
 	}
 }

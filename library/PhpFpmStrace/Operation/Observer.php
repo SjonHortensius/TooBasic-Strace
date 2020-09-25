@@ -4,4 +4,5 @@ use PhpFpmStrace\Syscall;
 
 interface Observer {
 	public function observe(Syscall $c): \Generator;
+	public function summary(): array;
 }
