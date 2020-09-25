@@ -41,8 +41,7 @@ abstract class Syscall
 		}
 		catch (\TypeError $e)
 		{
-			var_dump("Invalid args to construct ". static::class . ': '. print_r($args, true));
-			throw new \Exception("Invalid args to construct ". static::class . ': '. print_r($args, true), 0, $e);
+			throw new \Exception("Invalid args to construct ". static::class . ': '. json_encode($args), 0, $e);
 		}
 	}
 
@@ -187,6 +186,6 @@ abstract class Syscall
 
 	public function __toString(): string
 	{
-		return sprintf('%s', __CLASS__);
+		return sprintf('%s:%s', __CLASS__, json_encode($this->_args));
 	}
 }

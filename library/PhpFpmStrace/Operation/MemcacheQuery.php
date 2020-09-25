@@ -9,17 +9,26 @@ class MemcacheQuery implements Observer
 	protected int $_hits = 0;
 	protected Interval $_spent;
 	private Syscall\Sendto $_lastRequest;
+	protected static Interval $_spentTotal;
 
 	public function __construct()
 	{
 		$this->_spent = new Interval;
+
+		if (!isset(self::$_spentTotal))
+			self::$_spentTotal = new Interval;
 	}
 
-	public function executes(Syscall $c): \Generator
+	public static function register(Syscall\Opener $c): ?self
+	{
+		return ($c instanceof Syscall\Connect && 11211 === $c->port) ? new self : null;
+	}
+
+	public function observe(Syscall $c): \Generator
 	{
 		$msg = sprintf('[%s] %s: %%s', $c->getTimestamp()->format("H:m:s.u"), __CLASS__);
 
-		if ($c instanceof Syscall\Connect && 11211 === $c->port)
+		if ($c instanceof Syscall\Connect)
 		{
 			$host = $c->getArgument(1)["sin_addr"] ?? explode('"', $c->getArgument(1)[0])[1];
 			yield sprintf($msg, 'connecting to '.$host);
@@ -40,7 +49,9 @@ class MemcacheQuery implements Observer
 		}
 		elseif ($c instanceof Syscall\Recvfrom)
 		{
-			$this->_spent->add(Interval::fromDiff($c->getTimestamp(), $this->_lastRequest->getTimestamp()));
+			$spent = Interval::fromDiff($c->getTimestamp(), $this->_lastRequest->getTimestamp());
+			$this->_spent->add($spent);
+			self::$_spentTotal->add($spent);
 
 			//FIXME properly implement protocol
 			$p = explode('\\0', $c->getArgument(1));
@@ -52,8 +63,9 @@ class MemcacheQuery implements Observer
 			unset($this->_fds[ $c->getArgument(0) ]);
 	}
 
-	public function reset(): void
+	public function unregister(Syscall\Closer $c): void
 	{
 		$this->_fds = [];
+		$this->_spent = new Interval;
 	}
 }

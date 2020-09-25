@@ -1,41 +1,59 @@
 <?php namespace PhpFpmStrace;
-use PhpFpmStrace\Syscall\Opener;
 
 class Process
 {
 	protected int $_id;
+	/** @var Syscall[] $_calls */
 	protected array $_calls;
+	/** @var Syscall\Opener[] $_open */
 	protected array $_open;
-	protected $_listeners = [];
+	/** @var Operation\Observer[] $_observers */
+	protected array $_observers = [];
 
 	public function __construct(int $id)
 	{
 		$this->_id = $id;
-
-		$this->_listeners = [
-			new Operation\MemcacheQuery,
-			new Operation\MysqlQuery,
-		];
 	}
 
 	public function executes(Syscall $c): void
 	{
 		if ($c instanceof Syscall\Opener)
-			foreach ($c->spawns() as $id)
-				$this->_open[$id] = $c;
+		{
+			foreach (Analyzer::getObservers() as $class)
+			{
+				foreach ($c->spawns() as $id)
+				{
+					$this->_open[$id] = $c;
+
+					/** @var Operation\Observer $class */
+					$observer = $class::register(clone $c);
+
+					if (isset($observer))
+						$this->_observers[$id] = $observer;
+				}
+			}
+		}
 		elseif ($c instanceof Syscall\Closer)
 		{
-			if (!array_key_exists($c->closes(), $this->_open))
+			$id = $c->closes();
+
+			if (!array_key_exists($id, $this->_open))
 				throw new Exception('Closer %s was not opened by any of [%s]', [$c, implode(', ', $this->_open)]);
 
-			$this->_open[ $c->closes() ]->closedBy($c);
-			unset($this->_open[ $c->closes() ]);
+			$this->_open[$id]->closedBy(clone $c);
+			if (array_key_exists($id, $this->_observers))
+				$this->_observers[$id]->unregister(clone $c);
+
+			unset($this->_open[$id], $this->_observers[$id]);
+		}
+		elseif ($c instanceof Syscall\Operator)
+		{
+			foreach ($c->getDescriptors() as $id)
+				if (array_key_exists($id, $this->_observers))
+					foreach ($this->_observers[$id]->observe(clone $c) as $msg)
+						print $msg ."\n";
 		}
 
 		$this->_calls []= $c;
-
-		foreach ($this->_listeners as $l)
-			foreach ($l->executes($c) as $msg)
-				print $msg."\n";
 	}
 }

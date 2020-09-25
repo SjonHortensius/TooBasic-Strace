@@ -1,12 +1,16 @@
 <?php namespace PhpFpmStrace;
 
+use PhpFpmStrace\Operation\Observer;
+
 class Analyzer
 {
+	public static array $observers = [];
+
 	public static function parse($h): \Generator
 	{
 		while (false !== ($line = fgets($h)))
 		{
-			if (!preg_match('~^(?:\[pid (?P<pid>\d+)\] )?(?P<time>[0-9:.]+) (?P<call>[a-z0-9_]+)\((?P<args>.*?)\)(?: += (?P<retn>-?[x0-9a-f]+(?: [E\(].*?)?))?$~', rtrim($line, "\n"), $m))
+			if (!preg_match('~^(?:\[pid (?P<pid>\d+)\] )?(?P<time>[0-9:.]+) (?P<call>[a-z0-9_]+)\((?P<args>.*?)\)(?: += (?P<retn>-?[x0-9a-f]+(?: [^"]*?)?))?$~', rtrim($line, "\n"), $m))
 				throw new Exception('Could not parse line: '. $line);
 
 			yield intval($m['pid']) => Syscall::fromCall($m['time'], $m['call'], $m['args'], $m['retn']??"");
@@ -26,5 +30,20 @@ class Analyzer
 		}
 
 		print_r($processes);
+	}
+
+	public static function getObservers(): array
+	{
+		if (!empty(self::$observers))
+			return self::$observers;
+
+		foreach (glob(__DIR__ .'/Operation/*') as $path)
+			require_once($path);
+
+		foreach (get_declared_classes() as $class)
+			if ((new \ReflectionClass($class))->implementsInterface(Observer::class))
+				self::$observers []= $class;
+
+		return self::$observers;
 	}
 }
