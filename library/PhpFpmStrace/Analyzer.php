@@ -38,7 +38,7 @@ class Analyzer
 		if (!empty(self::$observers))
 			return self::$observers;
 
-		foreach (glob(__DIR__ .'/Operation/*') as $path)
+		foreach (glob(__DIR__ . '/Operation/*') as $path)
 			require_once($path);
 
 		foreach (get_declared_classes() as $class)

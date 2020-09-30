@@ -1,5 +1,7 @@
 <?php namespace PhpFpmStrace;
 
+use PhpFpmStrace\Operation\Observer;
+
 class Process
 {
 	protected int $_id;
@@ -13,14 +15,18 @@ class Process
 		$this->_id = $id;
 
 		foreach (Analyzer::getObservers() as $class)
-			$this->_observers []= new $class;
+			$this->_observers[$class]= new $class;
 	}
 
 	public function executes(Syscall $c): void
 	{
-		foreach ($this->_observers as $observer)
-			foreach ($observer->observe(clone $c) as $msg)
-				print $msg ."\n";
+		foreach ($this->_observers as $class => $observer)
+			foreach ($observer->observe(clone $c) as $level => $msg)
+				switch ($level)
+				{
+					case Observer::LEVEL_INFO: printf("<i style='color:gray'>[%s] %s: %s</i>\n", $c->getTimestamp()->format("H:m:s.u"), $class, $msg); break;
+					case Observer::LEVEL_CALL: printf("%s (took %s) %s: %s\n", $c->getTimestamp()->format("H:m:s.u"), $msg->took(), $class, (string)$msg); break;
+				}
 
 		$this->_calls []= $c;
 	}

@@ -55,6 +55,33 @@ abstract class Syscall
 		return $this->_args[$index];
 	}
 
+	public function getReturn(): int
+	{
+		return $this->_returns;
+	}
+
+	public static function decode(string $argument): string
+	{
+		$decoded = '';
+
+		if (preg_match_all('~\\\\[tnvfr]|\\\\[x0-9a-f]+|.~', $argument, $matches))
+			foreach ($matches[0] as $char)
+			{
+				if (1 === strlen($char))
+					$decoded .= $char;
+				// re-encode 'decoded' data
+				elseif (in_array($char, ['\t', '\n', '\v', '\f', '\r']))
+					$decoded .= str_replace(['\t', '\n', '\v', '\f', '\r'], ["\t", "\n", "\v", "\f", "\r"], $char);
+				// support strace -x option
+				elseif (substr($char, 0, 2) == '\x')
+					$decoded .= chr(hexdec(substr($char, 2)));
+				else
+					$decoded .= chr(hexdec(substr($char, 1)));
+			}
+
+		return $decoded;
+	}
+
 	// break up the string of arguments into an array representing only the TOP arguments.
 	// This roughly equals `explode(', ', $raw)` or `preg_match_all("/({.*?}|\[.*?\]|[^\[\]{}]+)(, |$)/", $raw);`
 	// but it properly leaves nested elements intact
@@ -93,8 +120,8 @@ abstract class Syscall
 				case 'string':
 					if ('\\' == $c && '"' === $raw[$i+1])
 					{
-						$buffer .= $c;
-						$i++; // eat encoded "
+						$i++; // eat \\
+						$buffer .= '"';
 					}
 					elseif ('"' == $c)
 						$state = null;

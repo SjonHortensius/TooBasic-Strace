@@ -1,6 +1,6 @@
 <?php namespace PhpFpmStrace;
 
-class Interval
+class Duration
 {
 	private float $_diff;
 
