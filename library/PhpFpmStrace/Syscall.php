@@ -52,7 +52,13 @@ abstract class Syscall
 
 	public function getArgument(int $index)
 	{
-		return $this->_args[$index];
+		$raw = $this->_args[$index];
+		if (is_string($raw))
+			return Syscall::decode($raw);
+		elseif (is_array($raw))
+			return array_map([self::class, 'decode'], $raw);
+		else
+			return $raw;
 	}
 
 	public function getReturn(): int

@@ -24,9 +24,10 @@ class MemcacheQuery implements Observer
 	{
 		if ($c instanceof Syscall\Connect && 11211 === $c->port)
 		{
+			$this->_fds[ intval($c->getArgument(0)) ] = true;
+
 			$host = $c->getArgument(1)["sin_addr"] ?? explode('"', $c->getArgument(1)[0])[1];
 			yield self::LEVEL_INFO => 'connecting to '.$host;
-			$this->_fds[ intval($c->getArgument(0)) ] = true;
 		}
 		elseif (!is_numeric($c->getArgument(0)) || !isset($this->_fds[ intval($c->getArgument(0)) ]))
 			return;
@@ -34,7 +35,7 @@ class MemcacheQuery implements Observer
 		if ($c instanceof Syscall\Sendto)
 		{
 			//FIXME properly implement protocol
-			$p = explode('\\0', $c->getArgument(1));
+			$p = explode('\0', $decoded = $c->getArgument(1));
 			$key = array_pop($p);
 
 			$this->_lastRequest = new Operation($this, $c, 'requesting '. $key);
