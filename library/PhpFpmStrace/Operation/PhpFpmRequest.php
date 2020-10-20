@@ -22,16 +22,12 @@ class PhpFpmRequest implements Observer
 		elseif (!is_numeric($c->getArgument(0)) || !isset($this->_fds[ intval($c->getArgument(0)) ]))
 			return;
 
-		// fastgi spec prefixes each k/v pair with a byte specifying the lengths
-		if ($c instanceof Syscall\Read && preg_match('~(..)REQUEST_URI(.*)~', $c->getArgument(1), $m))
+		if ($c instanceof Syscall\Read && false !== strpos($c->getArgument(1), 'REQUEST_URI'))
 		{
-			if (ord($m[1][0]) != 0x0b)
-				throw new Exception('FastCgi error; key `REQUEST_URI` unexpectedly passed as having length: %d', [ord($m[1][0])]);
+			$req = self::decodeKeyValuePairs($c->getArgument(1));
 
-			$requestUri = substr($m[2], 0, ord($m[1][1]));
-
-			$this->_lastRequest = new Operation($this, $c, $requestUri);
-			yield self::LEVEL_INFO => 'incoming request '. $requestUri;
+			$this->_lastRequest = new Operation($this, $c, $req['REQUEST_URI']);
+			yield self::LEVEL_INFO => 'incoming request '. $req['REQUEST_URI'];
 		}
 		elseif ($c instanceof Syscall\Write)
 		{
@@ -44,6 +40,41 @@ class PhpFpmRequest implements Observer
 
 			yield self::LEVEL_INFO => 'sending response, length: ' . $c->getReturn() . ' bytes';
 		}
+	}
+
+	// fastgi spec prefixes each k/v pair with a byte specifying their lengths
+	private static function decodeKeyValuePairs(string $data): array
+	{
+		$length = strlen($data);
+		$i = 0;
+		$kv = [];
+
+		// args can be truncated (trailing '...') but REQUEST_URI is usually in there
+		while ($i < $length-4)
+		{
+			$k = ord($data[$i++]);
+			if ($k >=128)
+			{
+				$k = ($k & 0x7F << 24);
+				$k |= (ord($data[$i++]) << 16);
+				$k |= (ord($data[$i++]) << 8);
+				$k |= (ord($data[$i++]));
+			}
+
+			$v = ord($data[$i++]);
+			if ($v >=128)
+			{
+				$v = ($v & 0x7F << 24);
+				$v |= (ord($data[$i++]) << 16);
+				$v |= (ord($data[$i++]) << 8);
+				$v |= (ord($data[$i++]));
+			}
+
+			$kv[ substr($data, $i, $k) ] = substr($data, $i+$k, $v);
+			$i += $k+$v;
+		}
+
+		return $kv;
 	}
 
 	public function summary(): array
